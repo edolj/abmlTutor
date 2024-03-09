@@ -231,7 +231,7 @@ class ABRuleLearner(RulesStar):
 
 
 if __name__ == '__main__':
-    path = os.getcwd() + "/orangecontrib/abml/data/"
+    path = os.getcwd() + "/backend/orange3-abml-master/orangecontrib/abml/data/"
     learning_data = Table(path+"adult_sample")
     #print(learning_data.domain)
     learner = ABRuleLearner()
