@@ -11,6 +11,7 @@ import numpy as np
 from orangecontrib.evcrules.rules import RulesStar
 from Orange.classification.rules import Rule, Selector
 from Orange.data import Table
+import pandas as pd
 
 valid_arguments_re = re.compile(
     r"""[" \s]*                                 # remove any special characters at the beginning
@@ -232,14 +233,16 @@ class ABRuleLearner(RulesStar):
 
 if __name__ == '__main__':
     path = os.getcwd() + "/backend/orange3-abml-master/orangecontrib/abml/data/"
-    learning_data = Table(path+"adult_sample")
+    learning_data = Table(path+"zoo")
     #print(learning_data.domain)
     learner = ABRuleLearner()
-    learner.evds = pickle.load(open(path+"adult_evds.pickle", "rb"))
-    #learner.calculate_evds(data)
-    pickle.dump(learner.evds, open(path+"adult_evds.pickle", "wb"))
+    learner.calculate_evds(learning_data)
     classifier = learner(learning_data)
+    #print(classifier)
+    
+    #print(learner.evds)
+    pickle.dump(learner.evds, open(path+"zoo_evds.pickle", "wb"))
 
-    for rl in classifier.rule_list:
-        print(rl.curr_class_dist.tolist(), rl, rl.quality)
+    for rule in classifier.rule_list:
+        print(rule.curr_class_dist.tolist(), rule, rule.quality)
     print()
