@@ -1,0 +1,7 @@
+Flu	patient	Arguments	temparature	vaccination	coughing	headache
+no yes	time	string	continuous	no yes	no yes	no yes
+class	meta	meta				
+no	1.0		36.5	yes	no	no
+yes	2.0	{temparature>=38}	38.2	no	yes	no
+yes	3.0		39.1	no	no	yes
+no	4.0	{vaccination}	38.5	yes	yes	no

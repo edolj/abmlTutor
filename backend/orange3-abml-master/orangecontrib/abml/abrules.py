@@ -11,7 +11,6 @@ import numpy as np
 from orangecontrib.evcrules.rules import RulesStar
 from Orange.classification.rules import Rule, Selector
 from Orange.data import Table
-import pandas as pd
 
 valid_arguments_re = re.compile(
     r"""[" \s]*                                 # remove any special characters at the beginning
@@ -68,7 +67,7 @@ class ABRuleLearner(RulesStar):
                 continue
             constraints[inst] = []
             args = argument_re.findall(args)
-            #print(args)
+            #print("args: ", args)
             for arg in args:
                 rule, unfinished = ABRuleLearner.create_rule_from_argument(arg, data, inst)
                 # if we have any unfinished selectors, we have to find some values for that
@@ -235,13 +234,15 @@ if __name__ == '__main__':
     path = os.getcwd() + "/backend/orange3-abml-master/orangecontrib/abml/data/"
     learning_data = Table(path+"zoo")
     #print(learning_data.domain)
+
     learner = ABRuleLearner()
     learner.calculate_evds(learning_data)
     classifier = learner(learning_data)
     #print(classifier)
-    
+
     #print(learner.evds)
-    pickle.dump(learner.evds, open(path+"zoo_evds.pickle", "wb"))
+    #to make pickle object
+    #pickle.dump(learner.evds, open(path+"zoo_evds.pickle", "wb"))
 
     for rule in classifier.rule_list:
         print(rule.curr_class_dist.tolist(), rule, rule.quality)
