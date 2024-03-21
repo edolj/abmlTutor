@@ -72,8 +72,8 @@ def find_critical(learner, data, n=5, k=5, random_state=0):
                     arg_ind.append(t)
         learn_ind = np.array(sorted(list(learn_ind)+arg_ind), dtype=int)
         test_ind = np.array([t for t in test_ind if t not in arg_ind], dtype=int)
-        learn = Table(data.domain, data[learn_ind])
-        test = Table(data.domain, data[test_ind])
+        learn = Table.from_table(data.domain, data[learn_ind])
+        test = Table.from_table(data.domain, data[test_ind])
 
         classifier = learner(learn)
         rules = classifier.rule_list
@@ -152,8 +152,14 @@ def analyze_argument(learner, data, index):
     counter_errs = prob_errors[counters]
     cnt_zip = list(zip(counter_errs, counters))
     cnt_zip.sort()
-    counters_vals, counters = zip(*cnt_zip)
-
+    if cnt_zip:
+        counters_vals, counters = zip(*cnt_zip)
+    else:
+        # Handle the case where no counterexamples were found
+        counters_vals = []
+        counters = []
+        print("No counterexamples found for the analyzed example.")
+    
     full_rule = rule
     if len(full_rule.selectors) == 0:
         prune = [(None, 0)]

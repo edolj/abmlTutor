@@ -11,6 +11,7 @@ import numpy as np
 from orangecontrib.evcrules.rules import RulesStar
 from Orange.classification.rules import Rule, Selector
 from Orange.data import Table
+from argumentation import find_critical, analyze_argument
 
 valid_arguments_re = re.compile(
     r"""[" \s]*                                 # remove any special characters at the beginning
@@ -229,21 +230,80 @@ class ABRuleLearner(RulesStar):
         bestr[indices] = rule
         bestq[indices] = rule.quality
 
+def addArgumentToColumn(file_path, row_index, argument_to_add):
+        # Read the contents of the .tab file
+        with open(file_path, "r") as file:
+            rows = file.readlines()
+
+        # Check if the row index is within the range of rows
+        if 0 <= row_index < len(rows):
+            # Split the row into columns using tab as delimiter
+            columns = rows[row_index].rstrip().split('\t')
+
+            # Add the string to the last column
+            columns.append(argument_to_add)
+
+            # Join the columns back into a row with tabs as delimiter
+            updated_row = '\t'.join(columns) + '\n'
+
+            # Update the specific row in the rows list
+            rows[row_index] = updated_row
+
+            # Write the updated contents back to the .tab file
+            with open(file_path, "w") as file:
+                file.writelines(rows)
+        else:
+            print("Row index out of range.")
 
 if __name__ == '__main__':
     path = os.getcwd() + "/backend/orange3-abml-master/orangecontrib/abml/data/"
     learning_data = Table(path+"zoo")
-    #print(learning_data.domain)
-
+    #print("domain: ", learning_data.domain)
+    
     learner = ABRuleLearner()
     learner.calculate_evds(learning_data)
     classifier = learner(learning_data)
-    #print(classifier)
+    #print("classifier: ", classifier)
 
-    #print(learner.evds)
+    #print("learner.evds: ", learner.evds)
     #to make pickle object
     #pickle.dump(learner.evds, open(path+"zoo_evds.pickle", "wb"))
 
     for rule in classifier.rule_list:
         print(rule.curr_class_dist.tolist(), rule, rule.quality)
     print()
+    
+    # ------------------
+    crit_ind, problematic, problematic_rules = find_critical(learner, learning_data)
+    
+    # Extract the critical instances from the original dataset
+    critical_instances = learning_data[crit_ind]
+    
+    # Print or process the critical instances as needed
+    #for instance in critical_instances:
+    #    print(instance)
+
+    most_critical_index = crit_ind[0]
+    print("Most critical index: ", most_critical_index)
+    #most_critical_instance = learning_data[most_critical_index]
+    #print("Most critical instance:", most_critical_instance)
+
+    # take input as argument
+    user_argument = input("Enter argument: ")
+    # change it to format {}
+    formatedArg = "{{{}}}".format(user_argument)
+    #print(formatedArg)
+    # add argument to argument column in line most_critical_index
+    file_path = path + "zoo.tab"
+    addArgumentToColumn(file_path, most_critical_index + 3, formatedArg)
+
+    # analyze argument
+    learning_data = Table(path+"zoo")
+    learner = ABRuleLearner()
+    learner.calculate_evds(learning_data)
+    counters, counters_vals, rule, prune = analyze_argument(learner, learning_data, most_critical_index)
+    print("counters: ", counters)
+    print("counters_vals: ", counters_vals)
+    for rule, freq in prune:
+        print("Rule:", rule)
+        print("Relative Frequency:", freq)
