@@ -11,7 +11,7 @@ import numpy as np
 from orangecontrib.evcrules.rules import RulesStar
 from Orange.classification.rules import Rule, Selector
 from Orange.data import Table
-from argumentation import find_critical, analyze_argument
+#from argumentation import find_critical, analyze_argument
 
 valid_arguments_re = re.compile(
     r"""[" \s]*                                 # remove any special characters at the beginning
@@ -230,32 +230,9 @@ class ABRuleLearner(RulesStar):
         bestr[indices] = rule
         bestq[indices] = rule.quality
 
-def addArgumentToColumn(file_path, row_index, argument_to_add):
-        # Read the contents of the .tab file
-        with open(file_path, "r") as file:
-            rows = file.readlines()
-
-        # Check if the row index is within the range of rows
-        if 0 <= row_index < len(rows):
-            # Split the row into columns using tab as delimiter
-            columns = rows[row_index].rstrip().split('\t')
-
-            # Add the string to the last column
-            columns.append(argument_to_add)
-
-            # Join the columns back into a row with tabs as delimiter
-            updated_row = '\t'.join(columns) + '\n'
-
-            # Update the specific row in the rows list
-            rows[row_index] = updated_row
-
-            # Write the updated contents back to the .tab file
-            with open(file_path, "w") as file:
-                file.writelines(rows)
-        else:
-            print("Row index out of range.")
-
 if __name__ == '__main__':
+    print()
+    """
     path = os.getcwd() + "/backend/orange3-abml-master/orangecontrib/abml/data/"
     learning_data = Table(path+"zoo")
     #print("domain: ", learning_data.domain)
@@ -273,7 +250,6 @@ if __name__ == '__main__':
         print(rule.curr_class_dist.tolist(), rule, rule.quality)
     print()
     
-    # ------------------
     crit_ind, problematic, problematic_rules = find_critical(learner, learning_data)
     
     # Extract the critical instances from the original dataset
@@ -307,3 +283,4 @@ if __name__ == '__main__':
     for rule, freq in prune:
         print("Rule:", rule)
         print("Relative Frequency:", freq)
+    """
