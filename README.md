@@ -9,4 +9,4 @@ Go to backend folder orange3-abml-master in terminal and run command: pip3 insta
 
 Go to backend folder orange3-evcrules-master in terminal and run command: pip3 install .
 
-Run abrules.py file
+Run main.py file
