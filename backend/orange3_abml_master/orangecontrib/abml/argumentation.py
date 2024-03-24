@@ -158,7 +158,7 @@ def analyze_argument(learner, data, index):
         # Handle the case where no counterexamples were found
         counters_vals = []
         counters = []
-        print("No counterexamples found for the analyzed example.")
+        #print("No counter examples found for the analyzed example.")
     
     full_rule = rule
     if len(full_rule.selectors) == 0:
@@ -174,5 +174,3 @@ def analyze_argument(learner, data, index):
             prune.append((tmp_rule, relative_freq(tmp_rule)))
 
     return counters, counters_vals, rule, prune
-
-
