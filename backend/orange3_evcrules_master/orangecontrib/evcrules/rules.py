@@ -229,6 +229,7 @@ class RulesStar(_RuleLearner):
 
     def calculate_evds(self, data):
         evd_creator = EVDFitter(max_rule_length=self.max_rule_length)
+        evd_creator.domain = data.domain
         self.evds = evd_creator(data).evds
 
     @staticmethod
