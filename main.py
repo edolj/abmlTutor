@@ -23,13 +23,20 @@ def addArgumentToColumn(file_path, row_index, argument_to_add):
     with open(file_path, "r") as file:
         rows = file.readlines()
 
+    # Get the header row and find the index of the 'Arguments' column
+    header = rows[0].rstrip().split('\t')
+    try:
+        arguments_index = header.index("Arguments")
+    except ValueError:
+        return False  # If 'Arguments' column is not found
+
     # Check if the row index is within the range of rows
     if 0 <= row_index < len(rows):
         # Split the row into columns using tab as delimiter
         columns = rows[row_index].rstrip().split('\t')
 
-        # Add the string to the last column
-        columns.append(argument_to_add)
+        # Append the argument_to_add value to the "Arguments" column
+        columns[arguments_index] += argument_to_add
 
         # Join the columns back into a row with tabs as delimiter
         updated_row = '\t'.join(columns) + '\n'
@@ -40,35 +47,45 @@ def addArgumentToColumn(file_path, row_index, argument_to_add):
         # Write the updated contents back to the .tab file
         with open(file_path, "w") as file:
             file.writelines(rows)
+        return True
     else:
-        print("Row index out of range.")
+        return False
 
-def removeArgumentFromColumn(file_path, row_index):
+def removeArgumentFromColumn(file_path, row_index, argument_to_remove):
     # Read the contents of the .tab file
     with open(file_path, "r") as file:
         rows = file.readlines()
 
-    # Check if the row index is within the range of rows
-    if 0 <= row_index < len(rows):
+    # Check if the row index is within the range of rows (excluding the header row)
+    if 0 < row_index < len(rows):
+        # Split the header row into columns to find the "Arguments" column index
+        header_columns = rows[0].rstrip().split('\t')
+        if "Arguments" not in header_columns:
+            print("Arguments column not found in the header.")
+            return
+
+        arguments_column_index = header_columns.index("Arguments")
+
         # Split the row into columns using tab as delimiter
         columns = rows[row_index].rstrip().split('\t')
 
-        # Check if there are arguments to remove
-        if len(columns) > 1:
-            # Remove the last argument
-            columns.pop()
-
-            # Join the columns back into a row with tabs as delimiter
-            updated_row = '\t'.join(columns) + '\n'
-
-            # Update the specific row in the rows list
-            rows[row_index] = updated_row
-
-            # Write the updated contents back to the .tab file
-            with open(file_path, "w") as file:
-                file.writelines(rows)
+        # Remove the argument_to_remove value from the "Arguments" column
+        arguments = columns[arguments_column_index].split(', ')
+        if argument_to_remove in arguments:
+            arguments.remove(argument_to_remove)
+            columns[arguments_column_index] = ', '.join(arguments)
         else:
-            print("No argument to remove from the specified row.")
+            print(f"Argument '{argument_to_remove}' not found in the 'Arguments' column.")
+
+        # Join the columns back into a row with tabs as delimiter
+        updated_row = '\t'.join(columns) + '\n'
+
+        # Update the specific row in the rows list
+        rows[row_index] = updated_row
+
+        # Write the updated contents back to the .tab file
+        with open(file_path, "w") as file:
+            file.writelines(rows)
     else:
         print("Row index out of range.")
 
@@ -98,6 +115,7 @@ def main():
         # critical examples
         stars_with_header("Finding critical examples...")
         crit_ind, problematic, problematic_rules = argumentation.find_critical(learner, learning_data)
+        print("Critical indexes:", crit_ind)
 
         # Extract the critical example from the original dataset
         critical_instances = learning_data[crit_ind]
@@ -117,7 +135,7 @@ def main():
                 break
         
         # selected index is now critical_index
-        critical_index = int(selectedInstanceIndex) - 1
+        critical_index = crit_ind[:5][int(selectedInstanceIndex) - 1]
 
         while True:
             # input argument
@@ -166,7 +184,7 @@ def main():
                 if inp in ('c', 'd'):
                     break
             if inp == 'c':
-                removeArgumentFromColumn(file_path, critical_index + 3)
+                removeArgumentFromColumn(file_path, critical_index + 3, formatedArg)
             if inp == 'd':
                 # show which critical example was done in this iteration
                 critical_instance = learning_data[critical_index]
