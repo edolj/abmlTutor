@@ -116,12 +116,13 @@ def main():
         stars_with_header("Finding critical examples...")
         crit_ind, problematic, problematic_rules = argumentation.find_critical(learner, learning_data)
         print("Critical indexes:", crit_ind)
+        print("Problematic:", problematic)
 
         # Extract the critical example from the original dataset
         critical_instances = learning_data[crit_ind]
         print("Critical instances:")
         for index, instance in enumerate(critical_instances[:5]):
-            print(index+1, " -> ", instance["credit.score"], " ", instance["activity.ime"])
+            print(index+1, " -> ", instance["credit.score"], " ", instance["activity.ime"], " ", problematic[:5][index])
             
         # show user 5 critical examples and let him choose
         while True:
@@ -170,7 +171,8 @@ def main():
             input("Press enter for argument analysis")
 
             stars_with_header("Analysing argument...")
-            counters, counters_vals, rule, prune = argumentation.analyze_argument(learner, learning_data, critical_index)
+            counters, counters_vals, rule, prune, best_rule = argumentation.analyze_argument(learner, learning_data, critical_index)
+            
             if len(counters) > 0:
                 counter_examples = learning_data[list(counters)]
                 print("Counter examples:")
