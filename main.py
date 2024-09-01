@@ -3,7 +3,7 @@
 __author__ = 'edo'
 
 import os
-from Orange.data import Table
+from Orange.data import Table, Domain
 from orangecontrib.evcrules.rules import RulesStar
 from Orange.classification.rules import Rule, Selector
 from backend.orange3_abml_master.orangecontrib.abml import abrules, argumentation
@@ -18,76 +18,27 @@ def stars_with_header(msg):
     print(txt)
     return
 
-def addArgumentToColumn(file_path, row_index, argument_to_add):
-    # Read the contents of the .tab file
-    with open(file_path, "r") as file:
-        rows = file.readlines()
+def addArgument(learning_data, row_index, user_argument):
+    # Find the index of the "Arguments" column in the metas
+    arguments_index = next((i for i, meta in enumerate(learning_data.domain.metas) if meta.name == "Arguments"), None)
+    
+    if arguments_index is None:
+        print("Error: 'Arguments' meta attribute not found.")
+        return
 
-    # Get the header row and find the index of the 'Arguments' column
-    header = rows[0].rstrip().split('\t')
-    try:
-        arguments_index = header.index("Arguments")
-    except ValueError:
-        return False  # If 'Arguments' column is not found
+    # Update the value in the "Arguments" column for the specified row
+    learning_data[row_index].metas[arguments_index] = user_argument
 
-    # Check if the row index is within the range of rows
-    if 0 <= row_index < len(rows):
-        # Split the row into columns using tab as delimiter
-        columns = rows[row_index].rstrip().split('\t')
+def removeArgument(learning_data, row_index):
+    # Find the index of the "Arguments" column in the metas
+    arguments_index = next((i for i, meta in enumerate(learning_data.domain.metas) if meta.name == "Arguments"), None)
+    
+    if arguments_index is None:
+        print("Error: 'Arguments' meta attribute not found.")
+        return
 
-        # Append the argument_to_add value to the "Arguments" column
-        columns[arguments_index] += argument_to_add
-
-        # Join the columns back into a row with tabs as delimiter
-        updated_row = '\t'.join(columns) + '\n'
-
-        # Update the specific row in the rows list
-        rows[row_index] = updated_row
-
-        # Write the updated contents back to the .tab file
-        with open(file_path, "w") as file:
-            file.writelines(rows)
-        return True
-    else:
-        return False
-
-def removeArgumentFromColumn(file_path, row_index, argument_to_remove):
-    # Read the contents of the .tab file
-    with open(file_path, "r") as file:
-        rows = file.readlines()
-
-    # Check if the row index is within the range of rows (excluding the header row)
-    if 0 < row_index < len(rows):
-        # Split the header row into columns to find the "Arguments" column index
-        header_columns = rows[0].rstrip().split('\t')
-        if "Arguments" not in header_columns:
-            print("Arguments column not found in the header.")
-            return
-
-        arguments_column_index = header_columns.index("Arguments")
-
-        # Split the row into columns using tab as delimiter
-        columns = rows[row_index].rstrip().split('\t')
-
-        # Remove the argument_to_remove value from the "Arguments" column
-        arguments = columns[arguments_column_index].split(', ')
-        if argument_to_remove in arguments:
-            arguments.remove(argument_to_remove)
-            columns[arguments_column_index] = ', '.join(arguments)
-        else:
-            print(f"Argument '{argument_to_remove}' not found in the 'Arguments' column.")
-
-        # Join the columns back into a row with tabs as delimiter
-        updated_row = '\t'.join(columns) + '\n'
-
-        # Update the specific row in the rows list
-        rows[row_index] = updated_row
-
-        # Write the updated contents back to the .tab file
-        with open(file_path, "w") as file:
-            file.writelines(rows)
-    else:
-        print("Row index out of range.")
+    # Clear the value in the "Arguments" column for the specified row
+    learning_data[row_index].metas[arguments_index] = ''
 
 def main():
     """
@@ -97,26 +48,25 @@ def main():
     path = os.getcwd() + "/backend/orange3_abml_master/orangecontrib/abml/data/"
     file_path = path + "bonitete_tutor.tab"
 
+    learning_data = Table(file_path)
+    learner = abrules.ABRuleLearner()
+
     input("Ready to learn? Press enter")
 
     # MAIN LOOP
     while True:
-        # learn
         stars_with_header("Learning rules...")
-        learning_data = Table(file_path)
-        learner = abrules.ABRuleLearner()
+
         learner.calculate_evds(learning_data)
         classifier = learner(learning_data)
 
+        # print learned rules
         for rule in classifier.rule_list:
             print(rule.curr_class_dist.tolist(), rule, rule.quality)
         print()
 
-        # critical examples
         stars_with_header("Finding critical examples...")
         crit_ind, problematic, problematic_rules = argumentation.find_critical(learner, learning_data)
-        print("Critical indexes:", crit_ind)
-        print("Problematic:", problematic)
 
         # Extract the critical example from the original dataset
         critical_instances = learning_data[crit_ind]
@@ -162,10 +112,8 @@ def main():
 
             # change it to format {argument}
             formatedArg = "{{{}}}".format(user_argument)
-            # add argument to argument column in row critical_index
-            addArgumentToColumn(file_path, critical_index + 3, formatedArg)
-            learning_data = Table(file_path)
-            learner = abrules.ABRuleLearner()
+            # add argument to "Arguments" column in row critical_index
+            addArgument(learning_data, critical_index, formatedArg)
             learner.calculate_evds(learning_data)
 
             input("Press enter for argument analysis")
@@ -186,7 +134,7 @@ def main():
                 if inp in ('c', 'd'):
                     break
             if inp == 'c':
-                removeArgumentFromColumn(file_path, critical_index + 3, formatedArg)
+                removeArgument(learning_data, critical_index)
             if inp == 'd':
                 # show which critical example was done in this iteration
                 critical_instance = learning_data[critical_index]
