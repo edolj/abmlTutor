@@ -151,7 +151,7 @@ def analyze_argument(learner, data, index):
     learner.target_instances = None
     assert len(rules) == 1
     rule = rules[0]
-    print(rule, rule.curr_class_dist, rule.quality)
+    #print(rule, rule.curr_class_dist, rule.quality)
     counters = rule.covered_examples & (Y != rule.target_class)
     counters = np.where(counters)[0]
     counter_errs = prob_errors[counters]
@@ -163,7 +163,6 @@ def analyze_argument(learner, data, index):
         # Handle the case where no counterexamples were found
         counters_vals = []
         counters = []
-        #print("No counter examples found for the analyzed example.")
     
     full_rule = rule
     if len(full_rule.selectors) == 0:
@@ -211,15 +210,36 @@ def generateExtendedRules(rule, unused_att, data, index):
     generate_att = []
     for att in unused_att:
         if att.is_continuous:
-            generate_att.append(att.name+"<=")
-            generate_att.append(att.name+">=")
+            generate_att.append(f"{att.name}<=")
+            generate_att.append(f"{att.name}>=")
         elif att.is_discrete:
             generate_att.append(att.name)
 
     ext_rules = []
     for att in generate_att:
         column, op, value = abrules.ABRuleLearner.parse_constraint(att, data, index)
-        if isinstance(value, str):
+
+        # Get the attribute from the data domain
+        attribute = data.domain.attributes[column]
+
+        # Check if the attribute is discrete (categorical)
+        if attribute.is_discrete:
+            # Get all possible discrete values for this attribute
+            possible_values = attribute.values
+
+            # Generate rules for each possible value using == and !=
+            for index, discrete_value in enumerate(possible_values):
+                # Create equality rule
+                selector_eq = Selector(column=column, op="==", value=index)
+                new_rule_eq = Rule(selectors=[selector_eq] + rule.selectors, domain=data.domain)
+                ext_rules.append(new_rule_eq)
+
+                # Create inequality rule
+                selector_neq = Selector(column=column, op="!=", value=index)
+                new_rule_neq = Rule(selectors=[selector_neq] + rule.selectors, domain=data.domain)
+                ext_rules.append(new_rule_neq)
+
+        else:
             if op == ">=":
                 value = np.min(data.X[column])
             else:

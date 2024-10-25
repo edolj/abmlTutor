@@ -57,49 +57,54 @@ def main():
     while True:
         stars_with_header("Learning rules...")
 
-        learner.calculate_evds(learning_data)
+        # use calculate_evds for extra precision
+        # learner.calculate_evds(learning_data)
+
         classifier = learner(learning_data)
 
         # print learned rules
         for rule in classifier.rule_list:
+            # distribution of samples to target class, rule, quality
             print(rule.curr_class_dist.tolist(), rule, rule.quality)
         print()
 
         stars_with_header("Finding critical examples...")
         crit_ind, problematic, problematic_rules = argumentation.find_critical(learner, learning_data)
+        #print("Critical index: ", crit_ind, "\nProblematic value: ", problematic)
 
         # Extract the critical example from the original dataset
         critical_instances = learning_data[crit_ind]
-        print("Critical instances:")
-        for index, instance in enumerate(critical_instances[:5]):
-            print(index+1, " -> ", instance["credit.score"], " ", instance["activity.ime"], " ", problematic[:5][index])
-            
+
         # show user 5 critical examples and let him choose
+        for index, instance in enumerate(critical_instances[:5]):
+            print("(%d) -> %s |||| %s |||| %s" % (index + 1, instance["credit.score"], instance["activity.ime"], problematic[:5][index]))
+            # problematic_rules tell us which rules classified wrong e.g. credit score is A but rule classified it as E
+            for pravilo in problematic_rules[index]:
+                print(pravilo)
+            print()
+        
         while True:
             selectedInstanceIndex = input("Choose critical example (number between 1 and 5): ")
     
-            # Check if the input is not a number or not in the specified range
             if not selectedInstanceIndex.isdigit() or int(selectedInstanceIndex) not in range(1, 6):
-                print("Invalid input. Please choose critical instance between 1 and 5.")
+                print("Invalid input. Please choose critical example between 1 and 5.")
                 continue
             else:
                 break
         
-        # selected index is now critical_index
+        # find selected example in data, get critical index
         critical_index = crit_ind[:5][int(selectedInstanceIndex) - 1]
 
         while True:
-            # input argument
             stars_with_header("Argument input...")
 
             while True:
-                # take input as argument
                 user_argument = input("Enter argument: ")
 
                 if user_argument in learning_data.domain:
                     break
                 else:
-                    print("Wrong argument")
+                    print("Wrong argument. Try again.")
             
             getIndex = learning_data.domain.index(user_argument)
             attribute = learning_data.domain[getIndex]
@@ -114,12 +119,18 @@ def main():
             formatedArg = "{{{}}}".format(user_argument)
             # add argument to "Arguments" column in row critical_index
             addArgument(learning_data, critical_index, formatedArg)
-            learner.calculate_evds(learning_data)
+
+            # use calculate_evds for extra precision
+            # learner.calculate_evds(learning_data)
 
             input("Press enter for argument analysis")
 
             stars_with_header("Analysing argument...")
             counters, counters_vals, rule, prune, best_rule = argumentation.analyze_argument(learner, learning_data, critical_index)
+
+            # get m-score for best_rule, best rule can be used to improve argument learning
+            m_score = learner.evaluator_norm.evaluate_rule(best_rule)
+            print("Rule m-score: ", m_score)
             
             if len(counters) > 0:
                 counter_examples = learning_data[list(counters)]
