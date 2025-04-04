@@ -50,6 +50,10 @@ def main():
 
     learning_data = Table(file_path)
     learner = abrules.ABRuleLearner()
+    
+    # optional
+    #learner.rule_finder.general_validator.max_rule_length = 3
+    #learner.rule_finder.general_validator.min_covered_examples = 5
 
     input("Ready to learn? Press enter")
 
@@ -70,8 +74,7 @@ def main():
 
         stars_with_header("Finding critical examples...")
         crit_ind, problematic, problematic_rules = argumentation.find_critical(learner, learning_data)
-        #print("Critical index: ", crit_ind, "\nProblematic value: ", problematic)
-
+        
         # Extract the critical example from the original dataset
         critical_instances = learning_data[crit_ind]
 
@@ -79,9 +82,9 @@ def main():
         for index, instance in enumerate(critical_instances[:5]):
             print("(%d) -> %s |||| %s |||| %s" % (index + 1, instance["credit.score"], instance["activity.ime"], problematic[:5][index]))
             # problematic_rules tell us which rules classified wrong e.g. credit score is A but rule classified it as E
-            for pravilo in problematic_rules[index]:
-                print(pravilo)
-            print()
+            #for pravilo in problematic_rules[index]:
+            #    print(pravilo)
+            #print()
         
         while True:
             selectedInstanceIndex = input("Choose critical example (number between 1 and 5): ")
@@ -126,12 +129,18 @@ def main():
             input("Press enter for argument analysis")
 
             stars_with_header("Analysing argument...")
-            counters, counters_vals, rule, prune, best_rule = argumentation.analyze_argument(learner, learning_data, critical_index)
+            counters, counters_vals, arg_rule, best_rule  = argumentation.analyze_argument(learner, learning_data, critical_index)
+            
+            # rule is the argumented one by user, best rule provide possible improved rule
+            arg_m_score = learner.evaluator_norm.evaluate_rule(arg_rule)
+            print("Arg rule: ", arg_rule)
+            print("Arg rule m-score: ", arg_m_score)
 
             # get m-score for best_rule, best rule can be used to improve argument learning
             m_score = learner.evaluator_norm.evaluate_rule(best_rule)
-            print("Rule m-score: ", m_score)
-            
+            print("Best rule: ", best_rule)
+            print("Best rule m-score: ", m_score)
+
             if len(counters) > 0:
                 counter_examples = learning_data[list(counters)]
                 print("Counter examples:")

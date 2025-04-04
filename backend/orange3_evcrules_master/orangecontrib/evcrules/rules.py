@@ -577,11 +577,11 @@ class EVDFitter(RulesStar):
 
         for cls in range(len(self.domain.class_var.values)):
             self.target_class = cls
-            print("estimating evd for class", cls)
+            # print("estimating evd for class", cls)
             # repeat n-times
             max_vals = defaultdict(list)
             for i in range(self.n):
-                print("{}/{}".format(i, self.n))
+                # print("{}/{}".format(i, self.n))
                 # randomize class
                 Yr = np.array(Y)
                 np.random.shuffle(Yr)
@@ -597,7 +597,7 @@ class EVDFitter(RulesStar):
             prev_median = 0
             for k in range(1, self.max_rule_length+1):
                 median = max(prev_median, bn.median(max_vals[k]))
-                print("med", median)
+                # print("med", median)
                 prev_median = median
                 beta = 2
                 mu = median + beta*np.log(np.log(2))
@@ -606,7 +606,7 @@ class EVDFitter(RulesStar):
                 else:
                     evd_cls[k] = EVDDist(0, 1, 0)
             evd[cls] = evd_cls
-            print()
+            # print()
 
         # returns an empty classifier
         return EVDFitterClassifier(evd, self.domain)

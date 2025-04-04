@@ -163,37 +163,46 @@ def analyze_argument(learner, data, index):
         # Handle the case where no counterexamples were found
         counters_vals = []
         counters = []
-    
-    full_rule = rule
-    if len(full_rule.selectors) == 0:
+
+    if len(rule.selectors) == 0:
         prune = [(None, 0)]
     else:
-        prune = [(full_rule, relative_freq(full_rule))]
-        for sel in full_rule.selectors:
+        prune = []
+        for sel in rule.selectors:
             # create a rule without this selector
             tmp_rule = Orange.classification.rules.Rule(selectors=[r for r in rule.selectors if r != sel],
                                                         domain=data.domain)
             tmp_rule.filter_and_store(X, Y, W, rule.target_class)
+            tmp_rule.prior_class_dist = rule.prior_class_dist
             tmp_rule.create_model()
-            prune.append((tmp_rule, relative_freq(tmp_rule)))
+    
+            m_score = learner.evaluator_norm.evaluate_rule(tmp_rule)
+            prune.append((tmp_rule, m_score))
 
-    # Determine the best pruned rule based on relative frequency
+    # Determine the best pruned rule
     best_pruned_rule, best_pruned_score = max(prune, key=lambda x: x[1])
 
     # Extending the full rule with new attributes
-    unused_attributes = get_unused_attributes(full_rule, data)
-    extended_rules = generateExtendedRules(full_rule, unused_attributes, data, index)
-    evaluated_extended_rules = evaluate_rules(extended_rules, X, Y, W, rule.target_class)
-    # Determine the best extended rule based on relative frequency
+    unused_attributes = get_unused_attributes(rule, data)
+    extended_rules = generateExtendedRules(rule, unused_attributes, data, index)
+    evaluated_extended_rules = evaluate_rules(learner, extended_rules, X, Y, W, rule.target_class)
+    # Determine the best extended rule
     best_extended_rule, best_extended_score = max(evaluated_extended_rules, key=lambda x: x[1])
+    
+    current_m_score = learner.evaluator_norm.evaluate_rule(rule)
+    current_rule = (rule, current_m_score)
 
-    # ext rule has better quality
-    if best_pruned_score < best_extended_score:
-        best_rule = best_extended_rule
-    else:
+    best_m_score = max(current_m_score, best_pruned_score, best_extended_score)
+
+    # Output the best rule based on the highest M-score (to show hint)
+    if best_m_score == current_m_score:
+        best_rule = current_rule[0]
+    elif best_m_score == best_pruned_score:
         best_rule = best_pruned_rule
+    else:
+        best_rule = best_extended_rule
 
-    return counters, counters_vals, rule, prune, best_rule
+    return counters, counters_vals, rule, best_rule
 
 def get_unused_attributes(rule, data):
     attUsed = []
@@ -232,11 +241,13 @@ def generateExtendedRules(rule, unused_att, data, index):
                 # Create equality rule
                 selector_eq = Selector(column=column, op="==", value=index)
                 new_rule_eq = Rule(selectors=[selector_eq] + rule.selectors, domain=data.domain)
+                new_rule_eq.prior_class_dist = rule.prior_class_dist
                 ext_rules.append(new_rule_eq)
 
                 # Create inequality rule
                 selector_neq = Selector(column=column, op="!=", value=index)
                 new_rule_neq = Rule(selectors=[selector_neq] + rule.selectors, domain=data.domain)
+                new_rule_neq.prior_class_dist = rule.prior_class_dist
                 ext_rules.append(new_rule_neq)
 
         else:
@@ -246,18 +257,18 @@ def generateExtendedRules(rule, unused_att, data, index):
                 value = np.max(data.X[column])
         selector = Selector(column=column, op=op, value=value)
         new_rule = Rule(selectors=[selector]+rule.selectors, domain=data.domain)
+        new_rule.prior_class_dist = rule.prior_class_dist
         ext_rules.append(new_rule)
     
     return ext_rules
 
-def evaluate_rules(rules, X, Y, W, target_class):
+def evaluate_rules(learner, rules, X, Y, W, target_class):
     evaluated_rules = [(None, 0)]
     for rule in rules:
         rule.filter_and_store(X, Y, W, target_class)
         rule.create_model()
-        score = relative_freq(rule)
-        if score != 1.0: # not overfit
-            evaluated_rules.append((rule, score))
+        m_score = learner.evaluator_norm.evaluate_rule(rule)
+        evaluated_rules.append((rule, m_score))    
     return evaluated_rules
 
 def get_categorical_and_numerical_attributes(domain):
