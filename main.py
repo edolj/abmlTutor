@@ -19,26 +19,39 @@ def stars_with_header(msg):
     return
 
 def addArgument(learning_data, row_index, user_argument):
-    # Find the index of the "Arguments" column in the metas
-    arguments_index = next((i for i, meta in enumerate(learning_data.domain.metas) if meta.name == "Arguments"), None)
-    
-    if arguments_index is None:
+    arguments_var = next((meta for meta in learning_data.domain.metas if meta.name == "Arguments"), None)
+
+    if arguments_var is None:
         print("Error: 'Arguments' meta attribute not found.")
-        return
-
-    # Update the value in the "Arguments" column for the specified row
-    learning_data[row_index].metas[arguments_index] = user_argument
-
-def removeArgument(learning_data, row_index):
-    # Find the index of the "Arguments" column in the metas
-    arguments_index = next((i for i, meta in enumerate(learning_data.domain.metas) if meta.name == "Arguments"), None)
+        return False
     
-    if arguments_index is None:
-        print("Error: 'Arguments' meta attribute not found.")
-        return
+    old_val = learning_data[row_index][arguments_var]
+    if old_val in (None, ""):
+        learning_data[row_index][arguments_var] = user_argument
+    else:
+        learning_data[row_index][arguments_var] = f"{old_val}, {user_argument}"
 
-    # Clear the value in the "Arguments" column for the specified row
-    learning_data[row_index].metas[arguments_index] = ''
+    return True
+
+def removeArgument(learning_data, row_index, formatedArg):
+    arguments_var = next((meta for meta in learning_data.domain.metas if meta.name == "Arguments"), None)
+    if arguments_var is None:
+        print("Error: 'Arguments' meta attribute not found.")
+        return False
+
+    old_val = learning_data[row_index][arguments_var]
+    if old_val is None:
+        return True
+
+    old_val_str = str(old_val)
+    args_list = [arg.strip() for arg in old_val_str.split(",")]
+    if formatedArg in args_list:
+        args_list.remove(formatedArg)
+
+    new_val = ", ".join(args_list) if args_list else ""
+    learning_data[row_index][arguments_var] = new_val
+
+    return True
 
 def main():
     """
@@ -154,7 +167,7 @@ def main():
                 if inp in ('c', 'd'):
                     break
             if inp == 'c':
-                removeArgument(learning_data, critical_index)
+                removeArgument(learning_data, critical_index, formatedArg)
             if inp == 'd':
                 # show which critical example was done in this iteration
                 critical_instance = learning_data[critical_index]
