@@ -3,7 +3,7 @@
 __author__ = 'edo'
 
 import os
-from Orange.data import Table, Domain
+from Orange.data import Table, Domain, StringVariable
 from orangecontrib.evcrules.rules import RulesStar
 from Orange.classification.rules import Rule, Selector
 from backend.orange3_abml_master.orangecontrib.abml import abrules, argumentation
@@ -53,6 +53,22 @@ def removeArgument(learning_data, row_index, formatedArg):
 
     return True
 
+def add_arguments_meta_column(data: Table) -> Table:
+    if any(m.name == "Arguments" for m in data.domain.metas):
+        return data
+
+    arguments_var = StringVariable("Arguments")
+    new_domain = Domain(
+        data.domain.attributes,
+        data.domain.class_var,
+        metas=[arguments_var] + list(data.domain.metas)
+    )
+
+    new_data = Table.from_table(new_domain, data)
+    new_data[:, arguments_var] = [[""] for _ in range(len(new_data))]
+
+    return new_data
+
 def main():
     """
     Main function, which contains the ABML interactive loop.
@@ -61,7 +77,8 @@ def main():
     path = os.getcwd() + "/backend/orange3_abml_master/orangecontrib/abml/data/"
     file_path = path + "bonitete_tutor.tab"
 
-    learning_data = Table(file_path)
+    table = Table(file_path)
+    learning_data = add_arguments_meta_column(table)
     learner = abrules.ABRuleLearner()
     
     # optional
