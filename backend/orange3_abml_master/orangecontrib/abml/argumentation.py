@@ -2,10 +2,9 @@
 """
 
 import numpy as np
-import Orange
+import Orange, re
 from Orange.data import Table
 from Orange.classification.rules import Rule, Selector
-from . import abrules
 from sklearn.model_selection import StratifiedKFold
 from scipy.spatial.distance import pdist, squareform
 
@@ -127,7 +126,7 @@ def find_critical(learner, data, n=5, k=5, random_state=0):
     return (crit_ind, problematic[crit_ind],
             [problematic_rules[i] for i in crit_ind])
 
-def analyze_argument(learner, data, index):
+def analyze_argument(learner, data, index, user_argument):
     """
     Analysing argumented example consists of finding counter examples,
     suggesting "safe" or "consistent" conditions and argument pruning.
@@ -142,17 +141,18 @@ def analyze_argument(learner, data, index):
     # learn rules; find best rule for each example (this will be needed to
     # select most relevant counters)
     X, Y, W = data.X, data.Y.astype(dtype=int), data.W if data.W else None
+    learner.target_instances = [index]
     clrules = learner(data)
+    rules = clrules.rule_list
+    learner.target_instances = None
+    
+    assert len(rules) == 1
+    cover_rule = rules[0]
+    
     predictions = clrules(data, 1)
     prob_errors = 1 - predictions[range(Y.shape[0]), list(Y)]
 
-    learner.target_instances = [index]
-    rules = learner(data).rule_list
-    learner.target_instances = None
-    assert len(rules) == 1
-    rule = rules[0]
-    #print(rule, rule.curr_class_dist, rule.quality)
-    counters = rule.covered_examples & (Y != rule.target_class)
+    counters = cover_rule.covered_examples & (Y != cover_rule.target_class)
     counters = np.where(counters)[0]
     counter_errs = prob_errors[counters]
     cnt_zip = list(zip(counter_errs, counters))
@@ -164,10 +164,33 @@ def analyze_argument(learner, data, index):
         counters_vals = []
         counters = []
 
-    if len(rule.selectors) == 0:
-        prune = [(None, 0)]
-    else:
-        prune = []
+    arguments = [a.strip() for a in user_argument.split(",") if a.strip()]
+    arg_ops = {}
+    arg_values = {}
+
+    for arg in arguments:
+        match = re.match(r'([\w./]+)\s*([<>]=?|=)\s*(.*)', arg)
+        if match:
+            name, op, value = match.groups()
+            arg_ops[name.strip()] = op.strip()
+            arg_values[name.strip()] = value.strip() or None
+        else:
+            arg_ops[arg] = "=="
+            arg_values[arg] = ""
+
+    p1_selectors = []
+    for sel in cover_rule.selectors:
+        attr_name = data.domain.attributes[sel.column].name
+        if attr_name in arg_ops and sel.op == arg_ops[attr_name]:
+            p1_selectors.append(sel)
+
+    rule = Orange.classification.rules.Rule(selectors=p1_selectors, domain=data.domain)
+    rule.filter_and_store(X, Y, W, cover_rule.target_class)
+    rule.prior_class_dist = cover_rule.prior_class_dist
+    rule.create_model()
+
+    prune = []
+    if len(rule.selectors) >= 2:
         for sel in rule.selectors:
             # create a rule without this selector
             tmp_rule = Orange.classification.rules.Rule(selectors=[r for r in rule.selectors if r != sel],
@@ -175,9 +198,11 @@ def analyze_argument(learner, data, index):
             tmp_rule.filter_and_store(X, Y, W, rule.target_class)
             tmp_rule.prior_class_dist = rule.prior_class_dist
             tmp_rule.create_model()
-    
+
             m_score = learner.evaluator_norm.evaluate_rule(tmp_rule)
             prune.append((tmp_rule, m_score))
+    else:
+        prune.append((None, 0.0))
 
     # Determine the best pruned rule
     best_pruned_rule, best_pruned_score = max(prune, key=lambda x: x[1])
@@ -190,19 +215,18 @@ def analyze_argument(learner, data, index):
     best_extended_rule, best_extended_score = max(evaluated_extended_rules, key=lambda x: x[1])
     
     current_m_score = learner.evaluator_norm.evaluate_rule(rule)
-    current_rule = (rule, current_m_score)
 
     best_m_score = max(current_m_score, best_pruned_score, best_extended_score)
 
     # Output the best rule based on the highest M-score (to show hint)
     if best_m_score == current_m_score:
-        best_rule = current_rule[0]
+        best_rule = rule
     elif best_m_score == best_pruned_score:
         best_rule = best_pruned_rule
     else:
         best_rule = best_extended_rule
 
-    return counters, counters_vals, rule, best_rule
+    return counters, rule, best_rule
 
 def get_unused_attributes(rule, data):
     attUsed = []
