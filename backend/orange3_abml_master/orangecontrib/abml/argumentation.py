@@ -141,22 +141,23 @@ def analyze_argument(learner, data, index, user_argument):
     # learn rules; find best rule for each example (this will be needed to
     # select most relevant counters)
     X, Y, W = data.X, data.Y.astype(dtype=int), data.W if data.W else None
-    learner.target_instances = [index]
     clrules = learner(data)
-    rules = clrules.rule_list
-    learner.target_instances = None
-    
-    assert len(rules) == 1
-    cover_rule = rules[0]
     
     predictions = clrules(data, 1)
     prob_errors = 1 - predictions[range(Y.shape[0]), list(Y)]
 
-    counters = cover_rule.covered_examples & (Y != cover_rule.target_class)
+    learner.target_instances = [index]
+    rules = learner(data).rule_list
+    learner.target_instances = None
+    assert len(rules) == 1
+    covering_rule = rules[0]
+    print("Covering rule: ", covering_rule)
+    counters = covering_rule.covered_examples & (Y != covering_rule.target_class)
+
     counters = np.where(counters)[0]
     counter_errs = prob_errors[counters]
     cnt_zip = list(zip(counter_errs, counters))
-    cnt_zip.sort()
+    cnt_zip.sort(reverse=True)
     if cnt_zip:
         counters_vals, counters = zip(*cnt_zip)
     else:
@@ -164,30 +165,8 @@ def analyze_argument(learner, data, index, user_argument):
         counters_vals = []
         counters = []
 
-    arguments = [a.strip() for a in user_argument.split(",") if a.strip()]
-    arg_ops = {}
-    arg_values = {}
-
-    for arg in arguments:
-        match = re.match(r'([\w./]+)\s*([<>]=?|=)\s*(.*)', arg)
-        if match:
-            name, op, value = match.groups()
-            arg_ops[name.strip()] = op.strip()
-            arg_values[name.strip()] = value.strip() or None
-        else:
-            arg_ops[arg] = "=="
-            arg_values[arg] = ""
-
-    p1_selectors = []
-    for sel in cover_rule.selectors:
-        attr_name = data.domain.attributes[sel.column].name
-        if attr_name in arg_ops and sel.op == arg_ops[attr_name]:
-            p1_selectors.append(sel)
-
-    rule = Orange.classification.rules.Rule(selectors=p1_selectors, domain=data.domain)
-    rule.filter_and_store(X, Y, W, cover_rule.target_class)
-    rule.prior_class_dist = cover_rule.prior_class_dist
-    rule.create_model()
+    rule = build_rule_from_user_args(covering_rule, user_argument, data, X, Y, W)
+    current_m_score = learner.evaluator_norm.evaluate_rule(rule)
 
     prune = []
     if len(rule.selectors) >= 2:
@@ -208,23 +187,19 @@ def analyze_argument(learner, data, index, user_argument):
     best_pruned_rule, best_pruned_score = max(prune, key=lambda x: x[1])
 
     # Extending the full rule with new attributes
-    unused_attributes = get_unused_attributes(rule, data)
-    extended_rules = generateExtendedRules(rule, unused_attributes, data, index)
+    #unused_attributes = get_unused_attributes(rule, data)
+    extended_rules = generateExtendedRules(rule, data, index, max_depth=1)
     evaluated_extended_rules = evaluate_rules(learner, extended_rules, X, Y, W, rule.target_class)
     # Determine the best extended rule
     best_extended_rule, best_extended_score = max(evaluated_extended_rules, key=lambda x: x[1])
     
-    current_m_score = learner.evaluator_norm.evaluate_rule(rule)
-
-    best_m_score = max(current_m_score, best_pruned_score, best_extended_score)
+    candidates = []
+    candidates.append((rule, current_m_score))
+    candidates.append((best_pruned_rule, best_pruned_score))
+    candidates.append((best_extended_rule, best_extended_score))
 
     # Output the best rule based on the highest M-score (to show hint)
-    if best_m_score == current_m_score:
-        best_rule = rule
-    elif best_m_score == best_pruned_score:
-        best_rule = best_pruned_rule
-    else:
-        best_rule = best_extended_rule
+    best_rule, best_score = max(candidates, key=lambda x: x[1])
 
     return counters, rule, best_rule
 
@@ -239,44 +214,64 @@ def get_unused_attributes(rule, data):
 
     return filtered_attributes
 
-def generateExtendedRules(rule, unused_att, data, index):
+def generate_one_step_extensions(rule, data, index):
     ext_rules = []
+    unused_att = get_unused_attributes(rule, data)
 
     for att in unused_att:
         column = data.domain.attributes.index(att)
-
-        # Get the value of this attribute in the current example
         ext_value = data[index][column]
 
         if att.is_discrete:
-            # Get index of value in domain
             value_name = ext_value.value
             if value_name not in att.values:
-                continue  # skip unknown or missing values
+                continue
             value_index = att.values.index(value_name)
 
-            # Equality selector
             selector_eq = Selector(column=column, op="==", value=value_index)
-            new_rule_eq = Rule(selectors=[selector_eq] + rule.selectors, domain=data.domain)
-            new_rule_eq.prior_class_dist = rule.prior_class_dist
+            new_rule_eq = Rule(
+                selectors=[selector_eq] + rule.selectors,
+                domain=data.domain,
+                prior_class_dist=rule.prior_class_dist
+            )
             ext_rules.append(new_rule_eq)
 
         elif att.is_continuous:
             value = ext_value
 
-            # "<=" selector
             selector_le = Selector(column=column, op="<=", value=value)
-            new_rule_le = Rule(selectors=[selector_le] + rule.selectors, domain=data.domain)
-            new_rule_le.prior_class_dist = rule.prior_class_dist
+            new_rule_le = Rule(
+                selectors=[selector_le] + rule.selectors,
+                domain=data.domain,
+                prior_class_dist=rule.prior_class_dist
+            )
             ext_rules.append(new_rule_le)
 
-            # ">=" selector
             selector_ge = Selector(column=column, op=">=", value=value)
-            new_rule_ge = Rule(selectors=[selector_ge] + rule.selectors, domain=data.domain)
-            new_rule_ge.prior_class_dist = rule.prior_class_dist
+            new_rule_ge = Rule(
+                selectors=[selector_ge] + rule.selectors,
+                domain=data.domain,
+                prior_class_dist=rule.prior_class_dist
+            )
             ext_rules.append(new_rule_ge)
 
     return ext_rules
+
+def generateExtendedRules(rule, data, index, max_depth=1):
+    all_rules = []
+    current_level = [rule]
+
+    for depth in range(max_depth):
+        next_level = []
+
+        for parent_rule in current_level:
+            children = generate_one_step_extensions(parent_rule, data, index)
+            next_level.extend(children)
+
+        all_rules.extend(next_level)
+        current_level = next_level
+
+    return all_rules
 
 def evaluate_rules(learner, rules, X, Y, W, target_class):
     evaluated_rules = [(None, 0)]
@@ -293,3 +288,35 @@ def get_categorical_and_numerical_attributes(domain):
         if attribute.is_continuous or attribute.is_discrete:
             categorical_and_numerical_attributes.append(attribute)
     return categorical_and_numerical_attributes
+
+def build_rule_from_user_args(rule, user_args, data, X, Y, W):
+    selected_selectors = []
+
+    for s in rule.selectors:
+        attr = data.domain[s.column]
+
+        if attr.is_discrete:
+            if attr.name in user_args:
+                selected_selectors.append(s)
+
+        else:  # continuous
+            key = f"{attr.name}{s.op}"
+            if key in user_args:
+                selected_selectors.append(s)
+
+    if not selected_selectors:
+        return None
+
+    new_rule = Rule(selectors=selected_selectors, 
+                    domain=data.domain,
+                    initial_class_dist=rule.initial_class_dist,
+                    prior_class_dist=rule.prior_class_dist,
+                    quality_evaluator=rule.quality_evaluator,
+                    complexity_evaluator=rule.complexity_evaluator,
+                    significance_validator=rule.significance_validator,
+                    general_validator=rule.general_validator)
+    new_rule.filter_and_store(X, Y, W, rule.target_class)
+    new_rule.do_evaluate()
+    new_rule.create_model()
+
+    return new_rule

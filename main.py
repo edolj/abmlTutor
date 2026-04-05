@@ -92,7 +92,7 @@ def main():
 
     table = Table(file_path)
     learning_data = add_arguments_meta_column(table)
-    learner = abrules.ABRuleLearner(evc=False)
+    learner = abrules.ABRuleLearner()
     
     # optional
     #learner.rule_finder.general_validator.max_rule_length = 3
@@ -127,7 +127,8 @@ def main():
 
         # show user 5 critical examples and let him choose
         for index, instance in enumerate(critical_instances):
-            print("(%d) -> %s" % (index + 1, instance))
+            # print("(%d) -> %s" % (index + 1, instance))
+            print("(%d) -> %s |||| %s |||| %s" % (index + 1, instance["credit.score"], instance["activity.ime"], problematic[:5][index]))
             # problematic_rules tell us which rules classified wrong e.g. credit score is A but rule classified it as E
             #for pravilo in problematic_rules[index]:
             #    print(pravilo)
@@ -151,9 +152,9 @@ def main():
             user_arguments = []
 
             while True:
-                user_argument = input("Enter argument (or type 'done' to finish): ")
+                user_argument = input("Enter argument (or type 'end' to stop with arguments): ")
 
-                if user_argument.lower() == "done":
+                if user_argument.lower() == "end":
                     break
 
                 if user_argument in learning_data.domain:
