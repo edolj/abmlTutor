@@ -157,7 +157,7 @@ def analyze_argument(learner, data, index, user_argument):
     counters = np.where(counters)[0]
     counter_errs = prob_errors[counters]
     cnt_zip = list(zip(counter_errs, counters))
-    cnt_zip.sort(reverse=True)
+    cnt_zip.sort()
     if cnt_zip:
         counters_vals, counters = zip(*cnt_zip)
     else:

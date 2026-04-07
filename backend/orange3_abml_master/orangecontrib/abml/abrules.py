@@ -112,7 +112,6 @@ class ABRuleLearner(RulesStar):
                     value = np.min(data.X[:, column])
                 else:
                     value = np.max(data.X[:, column])
-                unfinished.append(aci)
             selectors.append(Selector(column=column, op=op, value=value))
         rule = Rule(selectors=selectors, domain=data.domain)
         rule.filter_and_store(X, Y, W, Y[inst])
