@@ -283,11 +283,10 @@ def evaluate_rules(learner, rules, X, Y, W, target_class):
     return evaluated_rules
 
 def get_categorical_and_numerical_attributes(domain):
-    categorical_and_numerical_attributes = []
-    for attribute in domain:
-        if attribute.is_continuous or attribute.is_discrete:
-            categorical_and_numerical_attributes.append(attribute)
-    return categorical_and_numerical_attributes
+    return [
+        a for a in domain.attributes
+        if a.is_continuous or a.is_discrete
+    ]
 
 def build_rule_from_user_args(rule, user_args, data, X, Y, W):
     selected_selectors = []

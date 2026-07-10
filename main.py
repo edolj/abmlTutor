@@ -88,7 +88,7 @@ def main():
     """
 
     path = os.getcwd() + "/backend/orange3_abml_master/orangecontrib/abml/data/"
-    file_path = path + "bonitete_tutor.tab"
+    file_path = path + "bonitete_tutor" + ".tab"
 
     table = Table(file_path)
     learning_data = add_arguments_meta_column(table)
@@ -127,8 +127,8 @@ def main():
 
         # show user 5 critical examples and let him choose
         for index, instance in enumerate(critical_instances):
-            # print("(%d) -> %s" % (index + 1, instance))
-            print("(%d) -> %s |||| %s |||| %s" % (index + 1, instance["credit.score"], instance["activity.ime"], problematic[:5][index]))
+            print("(%d) -> %s" % (index + 1, instance))
+            #print("(%d) -> %s |||| %s |||| %s" % (index + 1, instance["credit.score"], instance["activity.ime"], problematic[:5][index]))
             # problematic_rules tell us which rules classified wrong e.g. credit score is A but rule classified it as E
             #for pravilo in problematic_rules[index]:
             #    print(pravilo)
