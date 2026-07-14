@@ -149,7 +149,11 @@ def analyze_argument(learner, data, index, user_argument):
     learner.target_instances = [index]
     rules = learner(data).rule_list
     learner.target_instances = None
-    assert len(rules) == 1
+    
+    if len(rules) == 0:
+        print("Argument does not cover target instance. Please change argument.")
+        return [], None, None
+
     covering_rule = rules[0]
     print("Covering rule: ", covering_rule)
     counters = covering_rule.covered_examples & (Y != covering_rule.target_class)

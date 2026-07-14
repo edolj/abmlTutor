@@ -168,6 +168,20 @@ def main():
                                 user_argument += sign
                                 break
 
+                        # Optional if user want to set upper/lower bound
+                        while True:
+                            bound = input("Enter bound (press Enter to skip): ")
+                            if bound == "":
+                                break
+
+                            try:
+                                float(bound)  # Check if valid number
+                                user_argument += bound
+                                break
+                            except ValueError:
+                                print("Please enter a valid number.")
+
+                    # print("user argument:", user_argument)
                     user_arguments.append(user_argument)
                 else:
                     print("Wrong argument. Try again.")
@@ -190,15 +204,17 @@ def main():
             stars_with_header("Analysing argument...")
             counters, arg_rule, best_rule = argumentation.analyze_argument(learner, learning_data, critical_index, user_argument)
             
-            # rule is the argumented one by user, best rule provide possible improved rule
-            arg_m_score = learner.evaluator_norm.evaluate_rule(arg_rule)
-            print("Arg rule: ", arg_rule)
-            print("Arg rule m-score: ", arg_m_score)
+            if arg_rule is not None:
+                # rule is the argumented one by user, best rule provide possible improved rule
+                arg_m_score = learner.evaluator_norm.evaluate_rule(arg_rule)
+                print("Arg rule: ", arg_rule)
+                print("Arg rule m-score: ", arg_m_score)
 
-            # get m-score for best_rule, best rule can be used to improve argument learning
-            m_score = learner.evaluator_norm.evaluate_rule(best_rule)
-            print("Best rule: ", best_rule)
-            print("Best rule m-score: ", m_score)
+            if best_rule is not None:
+                # get m-score for best_rule, best rule can be used to improve argument learning
+                m_score = learner.evaluator_norm.evaluate_rule(best_rule)
+                print("Best rule: ", best_rule)
+                print("Best rule m-score: ", m_score)
 
             if len(counters) > 0:
                 counter_examples = learning_data[list(counters)]
