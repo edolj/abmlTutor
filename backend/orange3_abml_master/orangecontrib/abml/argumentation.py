@@ -140,7 +140,7 @@ def analyze_argument(learner, data, index, user_argument):
 
     # learn rules; find best rule for each example (this will be needed to
     # select most relevant counters)
-    X, Y, W = data.X, data.Y.astype(dtype=int), data.W if data.W else None
+    X, Y, W = data.X, data.Y.astype(dtype=int), data.W if data.W.size > 0 else None
     clrules = learner(data)
     
     predictions = clrules(data, 1)
@@ -155,9 +155,12 @@ def analyze_argument(learner, data, index, user_argument):
         return [], None, None
 
     covering_rule = rules[0]
-    print("Covering rule: ", covering_rule)
-    counters = covering_rule.covered_examples & (Y != covering_rule.target_class)
-
+    rule = build_rule_from_user_args(covering_rule, user_argument, data, X, Y, W)
+    if rule is None:
+        print("Argument does not match the covering rule. Please change argument.")
+        return [], None, None
+    
+    counters = rule.covered_examples & (Y != rule.target_class)
     counters = np.where(counters)[0]
     counter_errs = prob_errors[counters]
     cnt_zip = list(zip(counter_errs, counters))
@@ -169,7 +172,6 @@ def analyze_argument(learner, data, index, user_argument):
         counters_vals = []
         counters = []
 
-    rule = build_rule_from_user_args(covering_rule, user_argument, data, X, Y, W)
     current_m_score = learner.evaluator_norm.evaluate_rule(rule)
 
     prune = []
@@ -293,18 +295,25 @@ def get_categorical_and_numerical_attributes(domain):
     ]
 
 def build_rule_from_user_args(rule, user_args, data, X, Y, W):
+    # user can enter > ali <, rules use >= in <=
+    user_args = re.sub(r'>(?!=)', '>=', user_args)
+    user_args = re.sub(r'<(?!=)', '<=', user_args)
+
+    tokens = [t.strip().strip("{} ") for t in user_args.split(",")]
+    
     selected_selectors = []
 
     for s in rule.selectors:
         attr = data.domain[s.column]
 
         if attr.is_discrete:
-            if attr.name in user_args:
+            if attr.name in tokens:
                 selected_selectors.append(s)
 
         else:  # continuous
             key = f"{attr.name}{s.op}"
-            if key in user_args:
+            pattern = re.escape(key) + r'[-+]?\d*\.?\d*(?:[eE][-+]?\d+)?'
+            if any(re.fullmatch(pattern, t) for t in tokens):
                 selected_selectors.append(s)
 
     if not selected_selectors:

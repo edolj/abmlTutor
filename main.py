@@ -19,6 +19,18 @@ def stars_with_header(msg):
     print(txt)
     return
 
+NOTACTIVE = {"id", "activity.id", "activity.ime", "Arguments", "public"}
+
+def activate_attribute(data, var):
+    if var in data.domain.attributes:
+        return data
+    new_domain = Domain(
+        list(data.domain.attributes) + [var],
+        data.domain.class_var,
+        metas=[m for m in data.domain.metas if m != var],
+    )
+    return Table.from_table(new_domain, data)
+
 def addArgument(learning_data, row_index, user_argument):
     arguments_var = next((meta for meta in learning_data.domain.metas if meta.name == "Arguments"), None)
 
@@ -27,7 +39,7 @@ def addArgument(learning_data, row_index, user_argument):
         return False
     
     old_val = learning_data[row_index][arguments_var]
-    if old_val in (None, ""):
+    if str(old_val).strip() in ("", "?", "nan", "None"):
         learning_data[row_index][arguments_var] = user_argument
     else:
         learning_data[row_index][arguments_var] = f"{old_val},{user_argument}"
@@ -88,11 +100,11 @@ def main():
     """
 
     path = os.getcwd() + "/backend/orange3_abml_master/orangecontrib/abml/data/"
-    file_path = path + "bonitete_tutor" + ".tab"
+    file_path = path + "learndata_start" + ".tab"
 
     table = Table(file_path)
     learning_data = add_arguments_meta_column(table)
-    learner = abrules.ABRuleLearner()
+    learner = abrules.ABRuleLearner(evc=False, m=2, parent_alpha=0.05)
     
     # optional
     #learner.rule_finder.general_validator.max_rule_length = 3
@@ -152,19 +164,27 @@ def main():
             user_arguments = []
 
             while True:
-                user_argument = input("Enter argument (or type 'end' to stop with arguments): ")
+                user_argument = input("Enter argument (or type 'e' to stop with arguments): ")
 
-                if user_argument.lower() == "end":
+                if user_argument.lower() == "e":
                     break
 
                 if user_argument in learning_data.domain:
+                    var = learning_data.domain[user_argument]
+                    if var.name in NOTACTIVE:
+                        print("Wrong argument. Try again.")
+                        continue
+                    if var in learning_data.domain.metas:
+                        learning_data = activate_attribute(learning_data, var)
+                        print(f"Attribute {var.name} activated.")
+                    
                     getIndex = learning_data.domain.index(user_argument)
                     attribute = learning_data.domain[getIndex]
 
                     if attribute.is_continuous:
                         while True:
-                            sign = input("Enter >= or <= : ")
-                            if sign in (">=", "<="):
+                            sign = input("Enter <= or >= or < or >: ")
+                            if sign in (">=", "<=", "<", ">"):
                                 user_argument += sign
                                 break
 

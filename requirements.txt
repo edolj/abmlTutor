@@ -1,0 +1,4 @@
+# Python 3.9.6 (preizkušeno)
+numpy==1.26.4
+Orange3==3.38.1
+scikit-learn==1.6.1
