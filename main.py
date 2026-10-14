@@ -3,11 +3,13 @@
 __author__ = 'edo'
 
 import os
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score
 from Orange.data import Table, Domain, StringVariable
 from orangecontrib.evcrules.rules import RulesStar
 from Orange.classification.rules import Rule, Selector
 from backend.orange3_abml_master.orangecontrib.abml import abrules, argumentation
-from backend.orange3_abml_master.orangecontrib.abml.examples import evaluate
 
 def stars_with_header(msg):
     """
@@ -19,7 +21,13 @@ def stars_with_header(msg):
     print(txt)
     return
 
-NOTACTIVE = {"id", "activity.id", "activity.ime", "Arguments", "public"}
+NOTACTIVE = {"id", "activity.id", "activity.ime", "Arguments"}
+
+EXPERT = [
+    "total.oper.liabilities/assets", "current.ratio", "lt.sales.growth",
+    "st.sales.growth", "lt.ebit.margin.change", "net.debt/EBITDA",
+    "equity.ratio", "TIE", "ROA",
+]
 
 def activate_attribute(data, var):
     if var in data.domain.attributes:
@@ -94,17 +102,46 @@ def add_arguments_meta_column(data: Table) -> Table:
 
     return new_data
 
+def move_to_meta(data, names):
+    to_meta = [a for a in data.domain.attributes if a.name in names]
+    new_domain = Domain(
+        [a for a in data.domain.attributes if a.name not in names],
+        data.domain.class_var,
+        metas=list(data.domain.metas) + to_meta,
+    )
+    return Table.from_table(new_domain, data)
+
+def load_learn_test(path, file_name="bonitete_tutor", test_size=0.3, seed=0):
+    table = Table(path + file_name + ".tab")
+    idx = list(range(len(table)))
+    learn_idx, test_idx = train_test_split(
+        idx, test_size=test_size, stratify=table.Y, random_state=seed)
+    learn = move_to_meta(table[learn_idx], EXPERT)
+    test = table[test_idx]
+    return learn, test
+
+def evaluate_on_test(classifier, learning_data, test_data):
+    test = test_data.transform(learning_data.domain)
+    probs = classifier(test, 1)
+    y = test.Y.astype(int)
+    ca = float(np.mean(np.argmax(probs, axis=1) == y))
+    onehot = np.eye(probs.shape[1])[y]
+    brier = float(np.mean(np.sum((probs - onehot) ** 2, axis=1)))
+    auc = float(roc_auc_score(y, probs[:, 1])) if probs.shape[1] == 2 else None
+    return {"CA": ca, "AUC": auc, "Brier": brier, "rules": len(classifier.rule_list)}
+
 def main():
     """
     Main function, which contains the ABML interactive loop.
     """
 
     path = os.getcwd() + "/backend/orange3_abml_master/orangecontrib/abml/data/"
-    file_path = path + "learndata_start" + ".tab"
+    learn_table, test_data = load_learn_test(path)
+    print(f"Learning: {len(learn_table)}  Test: {len(test_data)}")
 
-    table = Table(file_path)
-    learning_data = add_arguments_meta_column(table)
+    learning_data = add_arguments_meta_column(learn_table)
     learner = abrules.ABRuleLearner(evc=False, m=2, parent_alpha=0.05)
+    iteration = 0
     
     # optional
     #learner.rule_finder.general_validator.max_rule_length = 3
@@ -116,9 +153,6 @@ def main():
     while True:
         stars_with_header("Learning rules...")
 
-        # use calculate_evds for extra precision
-        # learner.calculate_evds(learning_data)
-
         classifier = learner(learning_data)
 
         # print learned rules
@@ -127,9 +161,13 @@ def main():
             print(rule.curr_class_dist.tolist(), rule, rule.quality)
         print()
 
-        # to get CA results
-        #scores = evaluate.evaluate_learners(data=learning_data)
-        #print(scores)
+        # ===== measures on test dataset =====
+        scores = evaluate_on_test(classifier, learning_data, test_data)
+        auc_txt = f"{scores['AUC']:.3f}" if scores["AUC"] is not None else "-"
+        print(f"[TEST] iter {iteration}: CA={scores['CA']:.3f} "
+              f"AUC={auc_txt} Brier={scores['Brier']:.3f} rules={scores['rules']}")
+        print()
+        # =====================================
 
         stars_with_header("Finding critical examples...")
         crit_ind, problematic, problematic_rules = argumentation.find_critical(learner, learning_data)
@@ -258,6 +296,7 @@ def main():
 
         # increment iteration
         stars_with_header("Next iteration:")
+        iteration += 1
 
     return 0
 

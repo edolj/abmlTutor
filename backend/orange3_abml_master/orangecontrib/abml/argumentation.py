@@ -162,15 +162,8 @@ def analyze_argument(learner, data, index, user_argument):
     
     counters = rule.covered_examples & (Y != rule.target_class)
     counters = np.where(counters)[0]
-    counter_errs = prob_errors[counters]
-    cnt_zip = list(zip(counter_errs, counters))
-    cnt_zip.sort()
-    if cnt_zip:
-        counters_vals, counters = zip(*cnt_zip)
-    else:
-        # Handle the case where no counterexamples were found
-        counters_vals = []
-        counters = []
+    dist_matrix = squareform(pdist(X, metric="seuclidean"))
+    counters = sorted((int(c) for c in counters), key=lambda i: dist_matrix[index][i])
 
     current_m_score = learner.evaluator_norm.evaluate_rule(rule)
 
